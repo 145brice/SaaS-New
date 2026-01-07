@@ -177,10 +177,65 @@ def dashboard():
 
 
 @app.route('/api/leads')
-@login_required
 def api_leads():
-    """API endpoint for leads"""
-    return jsonify(MOCK_LEADS)
+    """API endpoint to download CSV leads by city"""
+    import glob
+    from flask import send_file
+    
+    city = request.args.get('city', '').lower()
+    stripe_customer_id = request.args.get('customer_id', '')
+    
+    if not city:
+        return jsonify({'error': 'City parameter required'}), 400
+    
+    # Test emails that bypass Stripe validation
+    test_emails = ['145brice@gmail.com', 'test@example.com']
+    
+    # For production, validate Stripe customer
+    # if stripe_customer_id not in test_emails:
+    #     # Validate with Stripe here
+    #     pass
+    
+    # Option 1: Leads stored in same backend directory (for Render deployment)
+    # leads_base = os.path.join(os.path.dirname(__file__), 'leads', city)
+    
+    # Option 2: Leads stored in frontend directory (for local development)
+    frontend_leads = os.path.join(os.path.dirname(__file__), '..', '..', 'Fresh Repo Permits Clone', 'Permits-Front-End', 'leads', city)
+    backend_leads = os.path.join(os.path.dirname(__file__), 'leads', city)
+    
+    # Try backend first (production), then frontend (local dev)
+    if os.path.exists(backend_leads):
+        leads_base = backend_leads
+    elif os.path.exists(frontend_leads):
+        leads_base = frontend_leads
+    else:
+        return jsonify({'error': f'No leads directory found for {city}'}), 404
+    
+    # Find the most recent date folder
+    try:
+        date_folders = sorted([d for d in os.listdir(leads_base) if os.path.isdir(os.path.join(leads_base, d))], reverse=True)
+    except Exception as e:
+        return jsonify({'error': f'Error reading leads directory: {str(e)}'}), 500
+    
+    if not date_folders:
+        return jsonify({'error': f'No date folders found for {city}'}), 404
+    
+    latest_date = date_folders[0]
+    csv_pattern = os.path.join(leads_base, latest_date, f'*{city}*.csv')
+    csv_files = glob.glob(csv_pattern)
+    
+    if not csv_files:
+        return jsonify({'error': f'No CSV files found for {city}'}), 404
+    
+    csv_file = csv_files[0]
+    filename = os.path.basename(csv_file)
+    
+    return send_file(
+        csv_file,
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=filename
+    )
 
 
 if __name__ == '__main__':

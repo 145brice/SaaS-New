@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: permits-backend-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app_no_firebase.py
+    envVars:
+      - key: PORT
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: STRIPE_SECRET_KEY
+        sync: false
